@@ -32,8 +32,8 @@ struct InviteUserView: View {
                 Section("选择要邀请的用户") {
                     Picker("选择用户", selection: $selectedUserId) {
                         Text("请选择") .tag("")
-                        ForEach(store.knownUsers, id: \.id) { user in
-                            Text(user.name).tag(String(user.id))
+                        ForEach(store.friends, id: \.peerUserID) { friend in
+                            Text(friend.peerDisplayName).tag(String(friend.peerUserID))
                         }
                     }
                 }
@@ -60,6 +60,7 @@ struct InviteUserView: View {
             .padding(20)
         }
         .frame(width: 380, height: 260)
+        .onAppear { store.refreshFriends() }
     }
 }
 

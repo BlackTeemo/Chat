@@ -11,9 +11,9 @@ struct CreateGroupView: View {
     @EnvironmentObject var store: Store
     @Binding var isPresented: Bool
     @State private var groupName = ""
-    @State private var selectedMembers: [User] = []
+    @State private var selectedMembers: [ContactSnapshot] = []
     @State private var statusMessage = ""
-    
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -43,18 +43,18 @@ struct CreateGroupView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    List(store.knownUsers, id: \.id) { member in
+                    List(store.friends, id: \.peerUserID) { member in
                         HStack {
-                            Image(systemName: member.avatar)
-                            Text(member.name)
+                            Image(systemName: member.peerAvatar)
+                            Text(member.peerDisplayName)
                             Spacer()
-                            if selectedMembers.contains(where: { $0.id == member.id }) {
+                            if selectedMembers.contains(where: { $0.peerUserID == member.peerUserID }) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.blue)
                             }
                         }
                         .onTapGesture {
-                            if let index = selectedMembers.firstIndex(where: { $0.id == member.id }) {
+                            if let index = selectedMembers.firstIndex(where: { $0.peerUserID == member.peerUserID }) {
                                 selectedMembers.remove(at: index)
                             } else {
                                 selectedMembers.append(member)
@@ -76,7 +76,8 @@ struct CreateGroupView: View {
 
             Button("创建") {
                 if !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if store.createGroup(name: groupName, members: selectedMembers) {
+                    let users = selectedMembers.map { User(id: $0.peerUserID, name: $0.peerDisplayName, avatar: $0.peerAvatar) }
+                    if store.createGroup(name: groupName, members: users) {
                         isPresented = false
                     } else {
                         statusMessage = "创建失败"
@@ -88,6 +89,7 @@ struct CreateGroupView: View {
             .padding(20)
         }
         .frame(width: 400, height: 420)
+        .onAppear { store.refreshFriends() }
     }
 }
 

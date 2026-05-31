@@ -341,6 +341,7 @@ final class ChatDataPersistenceController {
     static let shared = ChatDataPersistenceController()
 
     private let container: NSPersistentContainer
+    var onRemoteChange: (() -> Void)?
 
     private init() {
         let model = Self.makeModel()
@@ -353,6 +354,22 @@ final class ChatDataPersistenceController {
         }
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         container.viewContext.automaticallyMergesChangesFromParent = true
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRemoteChange),
+            name: .NSPersistentStoreRemoteChange,
+            object: container.persistentStoreCoordinator
+        )
+    }
+
+    @objc private func handleRemoteChange(_ notification: Notification) {
+        container.viewContext.perform { [weak self] in
+            self?.container.viewContext.refreshAllObjects()
+            DispatchQueue.main.async {
+                self?.onRemoteChange?()
+            }
+        }
     }
 
     // MARK: - Conversations
@@ -609,6 +626,8 @@ final class ChatDataPersistenceController {
     private static func makeStoreDescription() -> NSPersistentStoreDescription {
         let desc = NSPersistentStoreDescription(url: storeURL())
         desc.type = NSSQLiteStoreType
+        desc.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+        desc.setOption(true as NSNumber, forKey: "NSPersistentStoreRemoteChangeNotificationOptionKey")
         return desc
     }
 

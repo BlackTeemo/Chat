@@ -84,6 +84,7 @@ final class Store: ObservableObject {
         dataPersistence.saveContact(ownerUserID: target.id, theirContact)
 
         refreshFriends()
+        refreshKnownUsers()
 
         let record = dataPersistence.createConversation(
             kind: "direct",
@@ -271,13 +272,70 @@ final class Store: ObservableObject {
             }
             return conversation
         }
+
+        dataPersistence.onRemoteChange = { [weak self] in
+            guard let self, let account = self.currentUser else { return }
+            self.refreshFriends()
+            self.refreshConversations(for: account)
+        }
     }
 
-    private func refreshKnownUsers() {
+    private func refreshConversations(for account: UserAccountSnapshot) {
+        let records = dataPersistence.loadConversationRecords(for: account.id)
+        let oldConversations = Conversations
+        Conversations = records.map { record in
+            let messageRecords = dataPersistence.loadMessages(conversationID: Int(record.recordID))
+            let members: [User] = record.kind == "group" ? (
+                dataPersistence.loadMembers(conversationID: Int(record.recordID)).compactMap { membership in
+                    authPersistence.account(userID: Int(membership.userID))?.makeUser()
+                }
+            ) : []
+
+            let old = oldConversations.first(where: { $0.id == Int(record.recordID) })
+            let conversation = old ?? Conversation(
+                id: Int(record.recordID),
+                avatar: record.avatar,
+                title: record.title,
+                kind: record.kind,
+                lastMessagePreview: record.lastMessagePreview,
+                lastMessageAt: record.lastMessageAt,
+                groupMembers: members,
+                directKey: record.directKey,
+                createdAt: record.createdAt
+            )
+
+            conversation.lastMessagePreview = record.lastMessagePreview
+            conversation.lastMessageAt = record.lastMessageAt
+            conversation.groupMembers = members
+            conversation.messages = messageRecords.map { record in
+                let sender = authPersistence.account(userID: Int(record.senderID))
+                return ChatMessage(
+                    id: record.messageID,
+                    content: record.content,
+                    senderID: Int(record.senderID),
+                    senderName: sender?.displayName ?? "用户\(record.senderID)",
+                    isCurrentUser: Int(record.senderID) == account.id
+                )
+            }
+
+            if record.kind != "group", let directKey = record.directKey {
+                let pid = Self.peerUserID(from: directKey, currentUserID: account.id)
+                if let peer = authPersistence.account(userID: pid) {
+                    conversation.title = peer.displayName
+                    conversation.avatar = peer.avatar
+                    conversation.peerUserID = peer.id
+                }
+            }
+
+            return conversation
+        }
+    }
+
+    func refreshKnownUsers() {
         knownUsers = loadKnownUsers()
     }
 
-    private func refreshFriends() {
+    func refreshFriends() {
         guard let currentUser else { return }
         friends = dataPersistence.loadContacts(ownerUserID: currentUser.id)
     }
