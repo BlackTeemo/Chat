@@ -1,5 +1,5 @@
 # Chat
-
+<video src="https://github.com/user-attachments/assets/47874adf-99a8-458b-b52c-f3dc3575efdc" controls width="100%"></video>
 > 最后更新：2026/6/1
 
 > 2026/5/30 ：登录页面、会话列表、聊天消息展示、消息发送。
